@@ -1,0 +1,66 @@
+apiVersion: "vault.banzaicloud.com/v1alpha1"
+kind: Vault
+metadata:
+  name: vault
+  namespace: default
+spec:
+  size: 1
+  image: vault:1.0.0
+  bankVaultsImage: banzaicloud/bank-vaults:0.4.14
+  serviceAccount: vault
+  serviceType: ClusterIP
+  ingress:
+    annotations:
+    spec: {}
+  volumes:
+    - name: vault-file
+      persistentVolumeClaim:
+        claimName: vault-file
+  volumeMounts:
+    - name: vault-file
+      mountPath: /vault/file
+  unsealConfig:
+    kubernetes:
+      secretNamespace: default
+  config:
+    storage:
+      file:
+        path: "/vault/file"
+    listener:
+      tcp:
+        address: "0.0.0.0:8200"
+        tls_cert_file: /vault/tls/server.crt
+        tls_key_file: /vault/tls/server.key
+    ui: true
+  externalConfig:
+    secrets:
+      - path: secret
+        type: kv
+        description: General secrets.
+        options:
+          version: 1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vault-file
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-ext
+  namespace: default
+spec:
+  ports:
+  - port: 8200
+    protocol: TCP
+    targetPort: 8200
+  selector:
+    app: vault
+  type: LoadBalancer
